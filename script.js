@@ -287,19 +287,21 @@ function stopCamera() {
     }
 }
 
-// 检测拇指和食指捏合
+// 检测拇指、食指和中指捏合
 function detectPinch(landmarks) {
     if (!landmarks || landmarks.length < 20) return;
 
-    // 拇指和食指索引 (HandPose模型)
+    // 手指索引 (HandPose模型)
     const thumbIndex = 4;  // 拇指指尖
     const indexFingerIndex = 8;  // 食指指尖
+    const middleFingerIndex = 12;  // 中指指尖
 
-    // 获取拇指和食指关键点
+    // 获取手指关键点
     const thumb = landmarks[thumbIndex];
     const indexFinger = landmarks[indexFingerIndex];
+    const middleFinger = landmarks[middleFingerIndex];
 
-    if (!thumb || !indexFinger) {
+    if (!thumb || !indexFinger || !middleFinger) {
         isDrawing = false;
         drawingModeIndicator.textContent = '未激活';
         drawingModeIndicator.className = 'px-2 py-1 bg-gray-200 text-gray-600 text-xs rounded-full';
@@ -311,20 +313,42 @@ function detectPinch(landmarks) {
     const thumbY = thumb[1] * (drawingCanvas.height / video.videoHeight);
     const indexX = indexFinger[0] * (drawingCanvas.width / video.videoWidth);
     const indexY = indexFinger[1] * (drawingCanvas.height / video.videoHeight);
+    const middleX = middleFinger[0] * (drawingCanvas.width / video.videoWidth);
+    const middleY = middleFinger[1] * (drawingCanvas.height / video.videoHeight);
 
-    // 计算拇指和食指之间的距离
-    const distance = getDistance(
+    // 计算手指之间的距离
+    const distanceThumbIndex = getDistance(
         { x: thumbX, y: thumbY },
         { x: indexX, y: indexY }
+    );
+    const distanceThumbMiddle = getDistance(
+        { x: thumbX, y: thumbY },
+        { x: middleX, y: middleY }
+    );
+    const distanceIndexMiddle = getDistance(
+        { x: indexX, y: indexY },
+        { x: middleX, y: middleY }
     );
 
     // 捏合检测阈值
     const pinchThreshold = 60;
-    const currentX = (thumbX + indexX) / 2;
-    const currentY = (thumbY + indexY) / 2;
+    // 计算三个指尖的中心点
+    const currentX = (thumbX + indexX + middleX) / 3;
+    const currentY = (thumbY + indexY + middleY) / 3;
+
+    // 检查是否三根手指都捏合在一起
+    const isPinched = distanceThumbIndex < pinchThreshold && 
+                      distanceThumbMiddle < pinchThreshold && 
+                      distanceIndexMiddle < pinchThreshold;
+
+    // 检查手掌是否展开 (所有手指之间的距离都大于展开阈值)
+    const spreadThreshold = 150;
+    const isSpread = distanceThumbIndex > spreadThreshold && 
+                     distanceThumbMiddle > spreadThreshold && 
+                     distanceIndexMiddle > spreadThreshold;
 
     // 处理捏合状态
-    if (distance < pinchThreshold) {
+    if (isPinched) {
         drawingModeIndicator.textContent = '已激活';
         drawingModeIndicator.className = 'px-2 py-1 bg-green-500 text-white text-xs rounded-full';
 
@@ -337,11 +361,13 @@ function detectPinch(landmarks) {
             lastX = currentX;
             lastY = currentY;
         }
-    } else {
+    } else if (isSpread) {
+        // 手掌展开，离开绘画模式
         drawingModeIndicator.textContent = '未激活';
         drawingModeIndicator.className = 'px-2 py-1 bg-gray-200 text-gray-600 text-xs rounded-full';
         isDrawing = false;
     }
+    // 否则保持当前状态
 }
 
 // 计算两点之间的距离
