@@ -1,0 +1,6 @@
+services:
+  cam_draw:
+    build: .
+    ports:
+      - "8000:80"
+    restart: always
